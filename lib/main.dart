@@ -25,36 +25,56 @@ class FaceDetectionScreen extends StatefulWidget {
 class _FaceDetectionScreenState extends State<FaceDetectionScreen> {
   File? _image;
   final picker = ImagePicker();
-  final FaceDetector faceDetector = FaceDetector(options: FaceDetectorOptions(enableContours: true, enableClassification: true));
+  final FaceDetector faceDetector = FaceDetector(
+    options: FaceDetectorOptions(enableClassification: true),
+  );
+
   String _faceMessage = "Nenhum rosto detectado";
 
-  Future<void> _getImage(ImageSource source) async {
+  Future<void> _pickImage(ImageSource source) async {
     final pickedFile = await picker.pickImage(source: source);
     if (pickedFile != null) {
       setState(() {
         _image = File(pickedFile.path);
-        _faceMessage = "Processando...";
+        _faceMessage = "Analisando...";
       });
-      _detectFaces();
+      await _detectFaces();
     }
   }
 
   Future<void> _detectFaces() async {
     if (_image == null) return;
+
     final inputImage = InputImage.fromFile(_image!);
     final List<Face> faces = await faceDetector.processImage(inputImage);
 
     setState(() {
-      _faceMessage = faces.isNotEmpty
-          ? "${faces.length} rosto(s) detectado(s)"
-          : "Nenhum rosto detectado";
+      if (faces.isNotEmpty) {
+        _faceMessage = faces.map((face) {
+          final smilingProbability = face.smilingProbability ?? 0.0;
+          String emotion = smilingProbability > 0.7
+              ? "Feliz 😃"
+              : smilingProbability > 0.3
+                  ? "Neutro 😐"
+                  : "Triste ☹️";
+          return "Rosto detectado: $emotion";
+        }).join("\n");
+      } else {
+        _faceMessage = "Nenhum rosto detectado";
+      }
     });
+  }
+
+  @override
+  void dispose() {
+    faceDetector.close();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Detector de Rosto')),
+      appBar: AppBar(title: Text('Detector de Emoções')),
       body: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -81,16 +101,5 @@ class _FaceDetectionScreenState extends State<FaceDetectionScreen> {
         ],
       ),
     );
-  }
-
-  Future<void> _pickImage(ImageSource source) async {
-    final pickedFile = await picker.pickImage(source: source);
-    if (pickedFile != null) {
-      setState(() {
-        _image = File(pickedFile.path);
-        _faceMessage = "Analisando...";
-      });
-      await _detectFaces();
-    }
   }
 }
